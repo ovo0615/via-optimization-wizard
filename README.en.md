@@ -85,6 +85,32 @@ entirely (the TDR resolution exceeds the via length), while 40 GHz and
 
 ![Step 4: run and results](docs/images/wizard-04-results.png)
 
+## Native optiSLang post-processing (24-point HFSS study)
+
+One click opens the optiSLang post-processor when the run completes — every
+chart below is computed and rendered by optiSLang itself, from a 24-point
+40 GHz HFSS sensitivity study (20 succeeded, 4 failed; the failures are
+honestly kept in the statistics).
+
+**MOP response surface**: the Kriging surface of stub length vs. resonance
+frequency, CoP = 98% — the quarter-wave physics fully captured by the
+surrogate, with residuals hugging the diagonal:
+
+![MOP response surface](docs/images/osl-mop-surface.png)
+
+**Sensitivity analysis**: correlation matrix and coefficients. The CoP
+matrix shows each parameter's contribution to each response (GND distance
+85.7% for keep-out area, stub 98% for resonance) — which knobs matter, at
+a glance:
+
+![Sensitivity analysis](docs/images/osl-sensitivity.png)
+
+**Pareto front**: the reflection vs. routing-area trade-off with the front
+in red, alongside the selected best design's parameters, responses, and
+constraint margin:
+
+![Pareto front](docs/images/osl-pareto.png)
+
 ## Public scope vs. private implementation
 
 This repository is a **case-study showcase**: the frontend source

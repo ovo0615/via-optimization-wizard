@@ -74,6 +74,28 @@ optiSLang 三段式流程                                Touchstone
 
 ![步驟四：執行與結果](docs/images/wizard-04-results.png)
 
+## optiSLang 原生後處理（24 點 HFSS 研究）
+
+跑完一鍵開啟 optiSLang 後處理——以下圖表全部由 optiSLang 計算與繪製，
+資料來自 24 點 40 GHz HFSS 敏感度研究（20 點成功、4 點失敗，
+失敗點誠實保留在統計中）。
+
+**MOP 響應曲面**：殘樁長度對共振頻率的 Kriging 曲面，CoP = 98%——
+四分之一波長物理被代理模型完整學起來，殘差緊貼對角線：
+
+![MOP 響應曲面](docs/images/osl-mop-surface.png)
+
+**敏感度分析**：相關矩陣與相關係數。CoP 矩陣顯示每個參數對每個響應的
+貢獻（GND 距離對 keep-out 面積 85.7%、殘樁對共振 98%）——
+「哪些參數重要」一目了然：
+
+![敏感度分析](docs/images/osl-sensitivity.png)
+
+**Pareto 前緣**：反射 vs 佈線面積的雙目標取捨，紅色為前緣，
+右側是選定最佳設計的參數、響應與約束餘裕：
+
+![Pareto 前緣](docs/images/osl-pareto.png)
+
 ## 公開範圍與私有實作
 
 本 repo 是**案例展示**：公開前端原始碼（React + Vite + TypeScript）、
