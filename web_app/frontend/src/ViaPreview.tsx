@@ -117,13 +117,15 @@ export default function ViaPreview({ point }: { point: DesignPoint }) {
       }
     }
 
-    // 標註
+    // 標註：集中在底部一列，不壓到圖形
     ctx.fillStyle = "#8b949e";
     ctx.font = "12px Calibri, 'Microsoft JhengHei'";
-    ctx.fillText(`pitch ${point.pitch_mm.toFixed(2)} mm`, 10, 20);
-    ctx.fillText(`antipad ${point.antipad_mm.toFixed(2)} mm`, 10, 38);
-    ctx.fillText(`GND 距離 ${point.gnd_distance_mm.toFixed(2)} mm`, 10, 56);
-    ctx.fillText(`stub ${point.stub_mm.toFixed(2)} mm（截面方向，圖中未顯示）`, 10, 74);
+    ctx.fillText(
+      `pitch ${point.pitch_mm.toFixed(2)}　antipad ${point.antipad_mm.toFixed(2)}　` +
+        `GND ${point.gnd_distance_mm.toFixed(2)}　stub ${point.stub_mm.toFixed(2)} mm`,
+      10,
+      h - 12,
+    );
   }, [point]);
 
   return (
