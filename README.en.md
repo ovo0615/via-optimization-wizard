@@ -104,6 +104,13 @@ jeff.hong@cadmen.com
 - Python 3.10; pyaedt 0.23.0, pyedb 0.65.1, ansys-optislang-core 1.5.0,
   scikit-rf 1.8.0, FastAPI
 
+## Acknowledgment
+
+The parametric via modeling in this project is based on **Via Wizard** by
+**Ming-Chih Lin** ([linmingchih](https://github.com/linmingchih)), a former
+Ansys technical expert. The stackup, padstack, backdrill, and differential
+fan-out modeling core was adapted from his work — special thanks to him.
+
 ## Notice
 
 This is Jeff Hong's personal technical portfolio. It is not an official

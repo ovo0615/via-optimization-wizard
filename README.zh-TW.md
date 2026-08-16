@@ -91,6 +91,13 @@ PyOptiSLang 流程建構）為私有，不在此 repo 內，因此 clone 後無�
 - Python 3.10；pyaedt 0.23.0、pyedb 0.65.1、ansys-optislang-core 1.5.0、
   scikit-rf 1.8.0、FastAPI
 
+## 致謝
+
+本專案的 via 參數化建模設計源自早期 Ansys 技術專家**林鳴志**
+（[linmingchih](https://github.com/linmingchih)）提供的
+[Via Wizard](https://github.com/linmingchih)——疊構、padstack、backdrill
+與差分出線的建模核心以其為基礎改造而來，特別感謝他。
+
 ## 聲明
 
 This is Jeff Hong's personal technical portfolio. It is not an official
