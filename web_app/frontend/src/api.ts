@@ -28,6 +28,35 @@ export interface StudyRequest {
   sweep_stop_ghz: number;
   min_resonance_ghz: number;
   dk: number;
+  stackup?: StackupLayer[];
+  in_layer?: string;
+  out_layer?: string;
+}
+
+export interface StackupLayer {
+  name: string;
+  type: "Conductor" | "Dielectric";
+  thickness: number;
+  dk: number | "";
+  df: number | "";
+  [key: string]: unknown;
+}
+
+export interface StackupInfo {
+  ok: boolean;
+  source: string;
+  layers: StackupLayer[];
+  conductor_names: string[];
+  weighted_dk: number;
+  total_thickness_mm: number;
+}
+
+export function importStackup(aedbPath: string): Promise<StackupInfo> {
+  return fetch("/api/stackup/import", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ aedb_path: aedbPath }),
+  }).then((r) => json<StackupInfo>(r));
 }
 
 export interface StudyStatus {

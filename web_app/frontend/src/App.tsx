@@ -9,12 +9,14 @@ import {
   fetchDesigns,
   fetchPreview,
   fetchStatus,
+  importStackup,
   listPrerun,
   loadPrerun,
   openInOptislang,
   startStudy,
   stopStudy,
 } from "./api";
+import type { StackupInfo } from "./api";
 import type { PrerunEntry } from "./api";
 import type { DesignRow } from "./api";
 import BrandMark from "./BrandMark";
@@ -53,8 +55,30 @@ const DEFAULT_RANGES: Ranges = {
 export default function App() {
   const [step, setStep] = useState(0);
 
-  // 步驟 1：範例（第一版只有內建 12 層板；讀客戶疊構之後加）
-  const [example, setExample] = useState<"demo12" | null>("demo12");
+  // 步驟 1：內建範例或客戶疊構
+  const [example, setExample] = useState<"demo12" | "custom">("demo12");
+  const [aedbPath, setAedbPath] = useState("");
+  const [stackup, setStackup] = useState<StackupInfo | null>(null);
+  const [outLayer, setOutLayer] = useState<string>("");
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  const onImportStackup = () => {
+    setImporting(true);
+    setImportError(null);
+    importStackup(aedbPath.trim().replace(/^"|"$/g, ""))
+      .then((info) => {
+        setStackup(info);
+        // 預設出線層：導體層裡靠上三分之一的那層（典型背鑽情境）
+        const inner = info.conductor_names.slice(1, -1);
+        setOutLayer(inner[Math.floor(inner.length / 3)] ?? inner[0] ?? "");
+      })
+      .catch((e) => setImportError(String(e)))
+      .finally(() => setImporting(false));
+  };
+
+  const usingCustom = example === "custom" && stackup !== null && outLayer !== "";
+  const effectiveDk = usingCustom && stackup ? stackup.weighted_dk : 3.8;
 
   // 步驟 2：範圍與預覽點（預覽點 = 各參數範圍中點）
   const [ranges, setRanges] = useState<Ranges>(DEFAULT_RANGES);
@@ -96,13 +120,13 @@ export default function App() {
     }
   }, [step]);
 
-  // 即時指標：拉桿改變 → 350ms 防抖 → /api/preview
+  // 即時指標：拉桿改變 → 350ms 防抖 → /api/preview（Dk 跟著疊構走）
   useEffect(() => {
     const t = window.setTimeout(() => {
-      fetchPreview(midpoint, 3.8).then(setMetrics).catch(() => setMetrics(null));
+      fetchPreview(midpoint, effectiveDk).then(setMetrics).catch(() => setMetrics(null));
     }, 350);
     return () => window.clearTimeout(t);
-  }, [midpoint]);
+  }, [midpoint, effectiveDk]);
 
   const poll = useCallback((id: string) => {
     fetchStatus(id)
@@ -135,7 +159,14 @@ export default function App() {
       cores_per_design: 4,
       sweep_stop_ghz: sweepStop,
       min_resonance_ghz: minResonance,
-      dk: 3.8,
+      dk: effectiveDk,
+      ...(usingCustom && stackup
+        ? {
+            stackup: stackup.layers,
+            in_layer: stackup.conductor_names[0],
+            out_layer: outLayer,
+          }
+        : {}),
     })
       .then(({ study_id }) => {
         setStudyId(study_id);
@@ -149,7 +180,7 @@ export default function App() {
     metrics === null || metrics.stub_resonance_ghz >= minResonance;
 
   const canNext =
-    (step === 0 && example !== null) ||
+    (step === 0 && (example === "demo12" || usingCustom)) ||
     step === 1 ||
     step === 2 ||
     (step === 3 && false);
@@ -374,11 +405,135 @@ export default function App() {
                     建模 35 秒、單點求解約 5 分鐘（40 GHz）。
                   </p>
                 </div>
-                <div className="choice-card" style={{ opacity: 0.45, cursor: "not-allowed" }}>
-                  <h4>從我的板子讀疊構（開發中）</h4>
-                  <p>讀取 .aedb／3D Layout 的真實疊構，幾何仍由參數化描述重建。</p>
+                <div
+                  className={`choice-card ${example === "custom" ? "selected" : ""}`}
+                  onClick={() => setExample("custom")}
+                >
+                  <h4>從我的板子讀疊構</h4>
+                  <p>讀取 .aedb 的真實疊構（層厚、Dk/Df、層名）；幾何仍由參數化描述重建。</p>
                 </div>
               </div>
+
+              {example === "custom" && (
+                <div className="glass-panel">
+                  <h3 className="panel-title">匯入疊構（唯讀，不會動到原始檔案）</h3>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <input
+                      type="text"
+                      value={aedbPath}
+                      onChange={(e) => setAedbPath(e.target.value)}
+                      placeholder="貼上 .aedb 完整路徑，例如 D:\Projects\my_board.aedb"
+                      style={{
+                        flex: 1,
+                        background: "rgba(255,255,255,0.05)",
+                        border: "1px solid var(--border-light)",
+                        borderRadius: 6,
+                        padding: "8px 12px",
+                        color: "var(--text-main)",
+                        fontFamily: "inherit",
+                        fontSize: 14,
+                      }}
+                    />
+                    <button
+                      className="premium-btn"
+                      disabled={importing || aedbPath.trim() === ""}
+                      onClick={onImportStackup}
+                    >
+                      {importing ? "讀取中…" : "讀取疊構"}
+                    </button>
+                  </div>
+
+                  {importError && (
+                    <p style={{ color: "var(--danger)", fontSize: 13, marginBottom: 0 }}>
+                      {importError}
+                    </p>
+                  )}
+
+                  {stackup && (
+                    <>
+                      <div className="metric-grid" style={{ marginTop: 12 }}>
+                        <div className="metric-card">
+                          <div className="label">層數（導體）</div>
+                          <div className="value">
+                            {stackup.layers.length}
+                            <span className="unit">（{stackup.conductor_names.length}）</span>
+                          </div>
+                        </div>
+                        <div className="metric-card">
+                          <div className="label">總厚度</div>
+                          <div className="value">
+                            {stackup.total_thickness_mm.toFixed(3)}
+                            <span className="unit">mm</span>
+                          </div>
+                        </div>
+                        <div className="metric-card">
+                          <div className="label">加權 Dk</div>
+                          <div className="value">{stackup.weighted_dk.toFixed(2)}</div>
+                        </div>
+                        <div className="metric-card">
+                          <div className="label">訊號入層</div>
+                          <div className="value" style={{ fontSize: 15 }}>
+                            {stackup.conductor_names[0]}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="param-row" style={{ marginTop: 4 }}>
+                        <div className="param-name">
+                          出線層
+                          <small>訊號轉出的內層；以下的殘樁被背鑽</small>
+                        </div>
+                        <select
+                          value={outLayer}
+                          onChange={(e) => setOutLayer(e.target.value)}
+                          style={{
+                            background: "rgba(255,255,255,0.05)",
+                            border: "1px solid var(--border-light)",
+                            borderRadius: 6,
+                            padding: "8px 12px",
+                            color: "var(--text-main)",
+                            fontFamily: "inherit",
+                            fontSize: 14,
+                          }}
+                        >
+                          {stackup.conductor_names.slice(1, -1).map((n) => (
+                            <option key={n} value={n} style={{ background: "#161c28" }}>
+                              {n}
+                            </option>
+                          ))}
+                        </select>
+                        <div />
+                      </div>
+
+                      <table className="design-table" style={{ marginTop: 8 }}>
+                        <thead>
+                          <tr>
+                            <th style={{ textAlign: "left" }}>層</th>
+                            <th style={{ textAlign: "left" }}>型別</th>
+                            <th>厚度 mm</th>
+                            <th>Dk</th>
+                            <th>Df</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {stackup.layers.map((l) => (
+                            <tr key={l.name}>
+                              <td style={{ textAlign: "left", color: l.name === outLayer ? "var(--accent)" : undefined }}>
+                                {l.name}
+                                {l.name === outLayer ? "（出線）" : ""}
+                              </td>
+                              <td style={{ textAlign: "left" }}>{l.type === "Conductor" ? "導體" : "介電"}</td>
+                              <td>{l.thickness.toFixed(4)}</td>
+                              <td>{typeof l.dk === "number" ? l.dk.toFixed(2) : "—"}</td>
+                              <td>{typeof l.df === "number" ? l.df.toFixed(4) : "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </>
+                  )}
+                </div>
+              )}
             </>
           )}
 
