@@ -3,7 +3,7 @@
 // 純前端重繪——幾何規則與後端 flatten.py 一致（P 在 −y、N 在 +y，
 // GND 以每顆訊號 via 為圓心、gndRadius 為半徑、對稱排列）。
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DesignPoint } from "./api";
 
 const GND_COUNT = 3;
@@ -23,6 +23,17 @@ function gndAngles(baseDeg: number): number[] {
 
 export default function ViaPreview({ point }: { point: DesignPoint }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  // 版面尺寸變動時觸發重繪——canvas 是點陣，只靠 CSS 拉伸會糊掉、
+  // 底部標註也會被裁（實測）。
+  const [resizeTick, setResizeTick] = useState(0);
+
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const ro = new ResizeObserver(() => setResizeTick((t) => t + 1));
+    ro.observe(canvas);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     const canvas = ref.current;
@@ -126,7 +137,7 @@ export default function ViaPreview({ point }: { point: DesignPoint }) {
       10,
       h - 12,
     );
-  }, [point]);
+  }, [point, resizeTick]);
 
   return (
     <div className="canvas-wrap">

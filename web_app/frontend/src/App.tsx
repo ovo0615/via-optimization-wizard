@@ -17,7 +17,11 @@ import {
 } from "./api";
 import type { PrerunEntry } from "./api";
 import type { DesignRow } from "./api";
+import BrandMark from "./BrandMark";
+import MenuBar from "./MenuBar";
+import type { Menu } from "./MenuBar";
 import ViaPreview from "./ViaPreview";
+import tadcLogo from "./assets/tadc-logo.png";
 
 const STEPS = ["範例與疊構", "設計空間", "目標與約束", "執行"] as const;
 
@@ -79,6 +83,8 @@ export default function App() {
   const [designs, setDesigns] = useState<DesignRow[]>([]);
   const [startError, setStartError] = useState<string | null>(null);
   const [prerun, setPrerun] = useState<PrerunEntry[]>([]);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [quickstartOpen, setQuickstartOpen] = useState(false);
   const pollRef = useRef<number | null>(null);
 
   // 預跑備援清單：進到執行頁時抓一次
@@ -148,13 +154,192 @@ export default function App() {
     step === 2 ||
     (step === 3 && false);
 
+  const canStart = step === 3 && !running;
+  const canOpenOsl = status?.status === "done" && studyId !== null;
+
+  // 快捷鍵：Ctrl+Enter 開始最佳化。輸入框裡不吃快捷鍵。
+  // 條件必須與選單項、面板按鈕一致（都是 canStart）。
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.ctrlKey && e.key === "Enter" && canStart) {
+        e.preventDefault();
+        onStart();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canStart]);
+
+  // 選單不自己實作行為——每一項都指向面板上已經有的動作，
+  // disabled 條件與面板按鈕、快捷鍵三者一致。
+  const menus: Menu[] = [
+    {
+      label: "檔案",
+      items: [
+        {
+          label: "載入預跑結果…",
+          disabled: running,
+          onSelect: () => setStep(3),
+        },
+        {
+          label: "用 optiSLang 開啟結果",
+          disabled: !canOpenOsl,
+          onSelect: () =>
+            studyId && openInOptislang(studyId).catch((e) => setStartError(String(e))),
+        },
+        { separator: true },
+        {
+          label: "重新整理預跑清單",
+          disabled: step !== 3 || running,
+          onSelect: () =>
+            listPrerun().then((r) => setPrerun(r.studies)).catch(() => setPrerun([])),
+        },
+      ],
+    },
+    {
+      label: "執行",
+      items: [
+        {
+          label: "開始最佳化",
+          hint: "Ctrl+Enter",
+          disabled: !canStart,
+          onSelect: onStart,
+        },
+        {
+          label: "停止",
+          disabled: !running,
+          onSelect: () => studyId && stopStudy(studyId),
+        },
+      ],
+    },
+    {
+      label: "檢視",
+      items: STEPS.map((name, i) => ({
+        label: `${i + 1}. ${name}`,
+        checked: step === i,
+        disabled: running,
+        onSelect: () => setStep(i),
+      })),
+    },
+    {
+      label: "說明",
+      items: [
+        { label: "快速上手", onSelect: () => setQuickstartOpen(true) },
+        { label: "關於 Via 最佳化精靈", onSelect: () => setAboutOpen(true) },
+      ],
+    },
+  ];
+
   return (
-    <div className="wizard">
-      <header className="wizard-header">
-        <div className="wizard-title">
-          Via 最佳化精靈
-          <small>optiSLang × PyAEDT</small>
+    <div className="app-shell">
+      <header className="topbar">
+        <div className="brand">
+          <BrandMark height={46} />
+          <div>
+            <h1>Via 最佳化精靈</h1>
+            <p className="sub">
+              optiSLang × PyAEDT 多目標 via 最佳化 · 此工具由虎門科技資深技術工程師
+              Jeff Hong 洪敬傑提供
+            </p>
+          </div>
         </div>
+        <div className="topbar-right">
+          <div className="status">
+            <span className={`dot ${running ? "busy" : ""}`} />
+            {running ? "研究執行中" : "本機服務 · 127.0.0.1"}
+          </div>
+          <img className="partner-logo" src={tadcLogo} alt="CADMEN 虎門科技 · Ansys Elite Channel Partner" />
+        </div>
+      </header>
+
+      <MenuBar menus={menus} />
+
+      {aboutOpen && (
+        <div className="modal-back" onClick={() => setAboutOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2>關於 Via 最佳化精靈</h2>
+              <button className="ghost-btn" onClick={() => setAboutOpen(false)}>
+                關閉
+              </button>
+            </div>
+            <div className="modal-body">
+              <p>
+                把 optiSLang 的多目標最佳化包成四步精靈——以 PyAEDT／PyEDB 參數化重建
+                差分 via 模型、HFSS 求解、TDR 抽取反射指標。
+              </p>
+              <h3>會影響結果、但畫面上看不出來的事</h3>
+              <ul>
+                <li>
+                  <b>假求解器的數值不保證正確</b>：反射是解析近似（趨勢對）；
+                  殘樁共振與 keep-out 面積用的是與 HFSS 模式相同的真公式。
+                  切到 HFSS 模式，同一條流程，數字就是真的。
+                </li>
+                <li>
+                  <b>掃頻 40 GHz 是實驗定的</b>：20 GHz 下 TDR 解析度比整根 via 長，
+                  好壞設計的排序會失真——省這個錢會做出錯的結論。
+                </li>
+                <li>
+                  <b>MOP 是代理模型</b>：最佳化階段的數字由 MOP 預測，可能出現
+                  略負的 |Γ| 這類外插假象；可信度看 CoP（開 optiSLang 後處理）。
+                </li>
+                <li>
+                  <b>每個設計點都是重建的完整 HFSS 模型</b>，不是改變數——
+                  所以幾何一律由參數化描述產生。
+                </li>
+                <li>
+                  <b>資料不離開本機</b>：服務只綁 127.0.0.1，疊構與結果都在本機磁碟。
+                </li>
+              </ul>
+              <h3>致謝</h3>
+              <p>
+                via 參數化建模設計源自早期 Ansys 技術專家林鳴志（linmingchih）的
+                Via Wizard。
+              </p>
+              <p>此工具由虎門科技資深技術工程師 Jeff Hong 洪敬傑提供。</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {quickstartOpen && (
+        <div className="modal-back" onClick={() => setQuickstartOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2>快速上手</h2>
+              <button className="ghost-btn" onClick={() => setQuickstartOpen(false)}>
+                關閉
+              </button>
+            </div>
+            <div className="modal-body">
+              <ul>
+                <li>
+                  <b>①範例與疊構</b>：選內建 12 層板差分 via 範例。
+                </li>
+                <li>
+                  <b>②設計空間</b>：拉四個參數的範圍；右側 keep-out 面積與殘樁共振
+                  是零求解即時算的——stub 拉太長會直接變紅。
+                </li>
+                <li>
+                  <b>③目標與約束</b>：反射 vs 佈線面積雙目標；殘樁共振當約束。
+                  展示用假求解器（秒回），真跑切 HFSS。
+                </li>
+                <li>
+                  <b>④執行</b>：三段式流程背景跑；沒時間就「載入預跑結果」秒回。
+                  跑完按「用 optiSLang 開啟」看敏感度、CoP、Pareto——那些圖是
+                  optiSLang 算的，可以親手拉。
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="wizard">
+      <header className="wizard-header">
         <nav className="steps">
           {STEPS.map((name, i) => (
             <div
@@ -495,7 +680,10 @@ export default function App() {
         </main>
 
         <aside className="wizard-side">
-          <div className="glass-panel" style={{ display: "flex", flexDirection: "column", minHeight: 380 }}>
+          <div
+            className="glass-panel"
+            style={{ display: "flex", flexDirection: "column", flex: "1 1 auto", minHeight: 0 }}
+          >
             <h3 className="panel-title">via 佈局預覽（範圍中點）</h3>
             <ViaPreview point={midpoint} />
           </div>
@@ -542,7 +730,11 @@ export default function App() {
       </div>
 
       <footer className="wizard-footer">
-        <span className="footer-brand">此工具由虎門科技資深技術工程師 Jeff Hong 洪敬傑提供</span>
+        <span className="footer-hint">
+          {step === 3
+            ? "Ctrl+Enter 開始最佳化；跑完可從「檔案」選單開 optiSLang 結果"
+            : "選單列「檢視」可直接跳到任一步"}
+        </span>
         <span className="footer-spacer" />
         {step > 0 && (
           <button className="ghost-btn" onClick={() => setStep(step - 1)} disabled={running}>
@@ -568,6 +760,7 @@ export default function App() {
           </button>
         )}
       </footer>
+      </div>
     </div>
   );
 }
