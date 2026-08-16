@@ -1,0 +1,63 @@
+# 此工具由虎門科技資深技術工程師 Jeff Hong 洪敬傑提供。
+
+# ── 公開／私有邊界 ──────────────────────────────────────────
+# 此 repo 對外是「案例展示」：只公開前端原碼與文件。
+# 後端（PyEDB 建模、HFSS 編排、PyoptiSLang 流程）一律不追蹤。
+web_app/backend/
+scripts/
+validation/
+
+# 工作區筆記（含本機路徑與未公開決策）
+工作區說明.md
+HANDOFF*.md
+
+# ── 資料與求解產物 ──────────────────────────────────────────
+*.aedb/
+*.aedt
+*.aedt.lock
+*.aedtresults/
+*.aedtz
+*.asol
+*.lock
+*.pyaedt
+
+# optiSLang 專案與結果
+*.opf
+*.opf_autosave
+*.opd
+*.opr
+*.omdb
+
+# 預跑資料庫（大型二進位，走 Release 附件或內部雲端）
+prerun/
+*.s*p
+*.snp
+
+# ── Python ────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# ── Node / Vite ───────────────────────────────────────────
+node_modules/
+.vite/
+*.tsbuildinfo
+# 前端 production 建置產物：本 repo 不提供可執行下載，故不追蹤
+dist/
+
+# ── 文件用資產 ────────────────────────────────────────────
+# 圖片只收已檢查過、不含本機路徑與客戶資訊的發布用圖
+*.png
+!docs/images/*.png
+*.mp4
+*.exe
+
+# ── 雜項 ──────────────────────────────────────────────────
+*.log
+batch.log
+~$*
+.claude/settings.local.json
+.claude/launch.json
+scratch-shots/
