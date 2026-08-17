@@ -7,6 +7,10 @@ web_app/backend/
 scripts/
 validation/
 
+# 啟動器沒有後端就跑不起來，放在公開版只會讓人以為下載了能執行
+web_app/start.bat
+web_app/start.ps1
+
 # 工作區筆記（含本機路徑與未公開決策）
 工作區說明.md
 HANDOFF*.md
@@ -54,8 +58,9 @@ dist/
 # 公司標誌（已授權用於公開展示）
 !web_app/frontend/src/assets/*.png
 
-# 內部 demo 講稿不進公開 repo（隨 private-full 分支進私有 repo）
+# 內部 demo 講稿與驗證工作計畫不進公開 repo（隨 private-full 分支進私有 repo）
 docs/demo腳本.md
+docs/驗證計畫.md
 *.mp4
 *.exe
 

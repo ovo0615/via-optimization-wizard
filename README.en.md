@@ -142,11 +142,13 @@ Below is a **real 12-layer board** (23 stackup entries including dielectrics,
 2.429 mm thick, weighted Dk 4.4, TOP in / inner L5 out) run as a 16-point
 40 GHz study — **16/16 solved successfully**, 93.7 minutes at 2 parallel:
 
-**Reflection MOP surface** (Moving Least Squares, CoP 83%): the corner with a
-small antipad and a long stub rises into a "reflection hill", with a flat
-low-reflection plain on the other side — which way to turn is obvious at a
-glance. The CoP matrix on the right simultaneously reports each parameter's
-contribution (stub 98.9% for resonance, GND distance 85.1% for area):
+**Reflection MOP surface** (Moving Least Squares, CoP 83%): plotted against
+stub length and antipad, the corner with a small antipad and a long stub
+rises into a "reflection hill", with a flat low-reflection plain on the other
+side — which way to turn is obvious at a glance. The CoP matrix on the right
+lays out every parameter's contribution to every response: stub 98.9% for
+resonance, stub 81.2% for reflection, GND distance 85.1% for area — which
+single knob dominates each response is written cell by cell:
 
 ![Reflection MOP surface, customer stackup](docs/images/osl-cust-mop-gamma.png)
 
