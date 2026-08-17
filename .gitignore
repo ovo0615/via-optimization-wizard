@@ -61,9 +61,11 @@ dist/
 # 公司標誌（已授權用於公開展示）
 !web_app/frontend/src/assets/*.png
 
-# 內部 demo 講稿與驗證工作計畫不進公開 repo（隨 private-full 分支進私有 repo）
+# 內部 demo 講稿、驗證計畫與安裝說明不進公開 repo
+# （隨 private-full 分支進私有 repo；安裝說明描述的是私有後端）
 docs/demo腳本.md
 docs/驗證計畫.md
+docs/安裝與使用說明.md
 *.mp4
 *.exe
 
