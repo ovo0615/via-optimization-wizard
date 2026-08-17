@@ -164,6 +164,38 @@ perfectly, residuals hugging the diagonal:
 
 ![Pareto front, customer stackup](docs/images/osl-cust-pareto.png)
 
+## "Can we trust the TDR you compute yourselves?"
+
+That is the first question every customer asks, so the answer is a
+cross-check against Ansys's own engine: the same Touchstone goes through
+this tool's scikit-rf IFFT on one path and through **AEDT Circuit's Nexxim
+time-domain convolution** (the official TDR probe) on the other. The design
+compared is the worst-reflecting point of the 16-point study.
+
+![TDR cross-check](docs/images/tdr-xcheck.png)
+
+| Metric | This tool | AEDT Circuit | Difference |
+| --- | ---: | ---: | ---: |
+| Impedance dip depth | 50.4 Ω | 49.7 Ω | **1.4%** |
+| Dip position | coincident after alignment | — | — |
+| Settled differential impedance | 73.3 Ω | 86.0 Ω | 12.7 Ω |
+
+**The dip is what counts**: the response is |Γ| = ΔZ/2Z, which measures the
+*step* in impedance rather than its absolute level — and the two engines
+agree on that step to within 1.4%.
+
+A third, independent check agrees as well: AEDT's settled value of 86.0 Ω
+matches the 85.5 Ω obtained algebraically from the frequency-domain Sdd11 at
+0.45 GHz. Those two paths share no code, so agreement is not the same error
+computed twice.
+
+The 12.7 Ω gap in the settled level has not been resolved, and it is listed
+here rather than cropped out. Touchstone DC-row extrapolation has been ruled
+out as the cause: removing that row leaves every one of the 16 designs' |Γ|
+values unchanged and the ranking identical. It must be settled before
+quoting *absolute* differential impedance; the ranking that drives the
+optimization is unaffected.
+
 ## Acknowledgment
 
 The parametric via modeling in this project is based on **Via Wizard** by
