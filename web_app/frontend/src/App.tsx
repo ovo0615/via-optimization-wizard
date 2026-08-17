@@ -121,6 +121,8 @@ export default function App() {
   const [designs, setDesigns] = useState<DesignRow[]>([]);
   const [startError, setStartError] = useState<string | null>(null);
   const [prerun, setPrerun] = useState<PrerunEntry[]>([]);
+  // optiSLang GUI 冷啟動要 48 秒（實測），期間得讓畫面有話說
+  const [oslOpening, setOslOpening] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [quickstartOpen, setQuickstartOpen] = useState(false);
   const pollRef = useRef<number | null>(null);
@@ -248,10 +250,15 @@ export default function App() {
           onSelect: () => setStep(3),
         },
         {
-          label: "用 optiSLang 開啟結果",
-          disabled: !canOpenOsl,
-          onSelect: () =>
-            studyId && openInOptislang(studyId).catch((e) => setStartError(String(e))),
+          label: oslOpening ? "optiSLang 啟動中…" : "用 optiSLang 開啟結果",
+          disabled: !canOpenOsl || oslOpening,
+          onSelect: () => {
+            if (!studyId) return;
+            setOslOpening(true);
+            openInOptislang(studyId)
+              .catch((e) => setStartError(String(e)))
+              .finally(() => window.setTimeout(() => setOslOpening(false), 60000));
+          },
         },
         { separator: true },
         {
@@ -867,13 +874,28 @@ export default function App() {
                   <span>
                     <b>看完整結果：</b>敏感度蜘蛛圖、CoP 矩陣、互動式
                     Pareto——這些圖是 optiSLang 算的，開原生介面讓客戶親手拉。
+                    {oslOpening && (
+                      <>
+                        <br />
+                        <b>optiSLang 正在啟動</b>，冷啟動約需一分鐘才會看到視窗，
+                        期間畫面不會有動靜，屬正常。
+                      </>
+                    )}
                   </span>
                   <button
                     className="premium-btn"
                     style={{ flexShrink: 0 }}
-                    onClick={() => openInOptislang(studyId).catch((e) => setStartError(String(e)))}
+                    disabled={oslOpening}
+                    onClick={() => {
+                      // optiSLang 冷啟動實測 48 秒才看得到視窗。沒有這個
+                      // 狀態的話，簡報者按完鈕就是對著沒有反應的畫面站著。
+                      setOslOpening(true);
+                      openInOptislang(studyId)
+                        .catch((e) => setStartError(String(e)))
+                        .finally(() => window.setTimeout(() => setOslOpening(false), 60000));
+                    }}
                   >
-                    用 optiSLang 開啟
+                    {oslOpening ? "optiSLang 啟動中…" : "用 optiSLang 開啟"}
                   </button>
                 </div>
               )}
