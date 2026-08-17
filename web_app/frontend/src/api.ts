@@ -51,6 +51,14 @@ export interface StackupInfo {
   total_thickness_mm: number;
 }
 
+export function browseEdb(initial = ""): Promise<{ path: string }> {
+  return fetch("/api/browse/edb", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ initial }),
+  }).then((r) => json<{ path: string }>(r));
+}
+
 export function importStackup(aedbPath: string): Promise<StackupInfo> {
   return fetch("/api/stackup/import", {
     method: "POST",

@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DesignPoint, ParamRange, PreviewMetrics, StudyStatus } from "./api";
 import {
+  browseEdb,
   fetchDesigns,
   fetchPreview,
   fetchStatus,
@@ -62,6 +63,19 @@ export default function App() {
   const [outLayer, setOutLayer] = useState<string>("");
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+
+  const [browsing, setBrowsing] = useState(false);
+
+  const onBrowse = () => {
+    setBrowsing(true);
+    setImportError(null);
+    browseEdb(aedbPath)
+      .then(({ path }) => {
+        if (path) setAedbPath(path);
+      })
+      .catch((e) => setImportError(String(e)))
+      .finally(() => setBrowsing(false));
+  };
 
   const onImportStackup = () => {
     setImporting(true);
@@ -187,6 +201,7 @@ export default function App() {
 
   const canStart = step === 3 && !running;
   const canOpenOsl = status?.status === "done" && studyId !== null;
+  const canBrowse = !running && !browsing;
 
   // 快捷鍵：Ctrl+Enter 開始最佳化。輸入框裡不吃快捷鍵。
   // 條件必須與選單項、面板按鈕一致（都是 canStart）。
@@ -198,11 +213,18 @@ export default function App() {
         e.preventDefault();
         onStart();
       }
+      // Ctrl+O 與選單項、面板按鈕指向同一個動作、同一個可用條件
+      if (e.ctrlKey && (e.key === "o" || e.key === "O") && canBrowse) {
+        e.preventDefault();
+        setExample("custom");
+        setStep(0);
+        onBrowse();
+      }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canStart]);
+  }, [canStart, canBrowse]);
 
   // 選單不自己實作行為——每一項都指向面板上已經有的動作，
   // disabled 條件與面板按鈕、快捷鍵三者一致。
@@ -210,6 +232,16 @@ export default function App() {
     {
       label: "檔案",
       items: [
+        {
+          label: "瀏覽 .aedb 選疊構…",
+          hint: "Ctrl+O",
+          disabled: !canBrowse,
+          onSelect: () => {
+            setExample("custom");
+            setStep(0);
+            onBrowse();
+          },
+        },
         {
           label: "載入預跑結果…",
           disabled: running,
@@ -422,7 +454,7 @@ export default function App() {
                       type="text"
                       value={aedbPath}
                       onChange={(e) => setAedbPath(e.target.value)}
-                      placeholder="貼上 .aedb 完整路徑，例如 D:\Projects\my_board.aedb"
+                      placeholder="按「瀏覽…」選擇，或直接貼上 .aedb 路徑"
                       style={{
                         flex: 1,
                         background: "rgba(255,255,255,0.05)",
@@ -434,6 +466,9 @@ export default function App() {
                         fontSize: 14,
                       }}
                     />
+                    <button className="ghost-btn" disabled={browsing} onClick={onBrowse}>
+                      {browsing ? "選擇中…" : "瀏覽…"}
+                    </button>
                     <button
                       className="premium-btn"
                       disabled={importing || aedbPath.trim() === ""}
@@ -442,6 +477,16 @@ export default function App() {
                       {importing ? "讀取中…" : "讀取疊構"}
                     </button>
                   </div>
+                  <p style={{ fontSize: 12.5, color: "var(--text-muted)", margin: "8px 0 0" }}>
+                    .aedb 是資料夾——對話框裡請點進去選 <b>edb.def</b>，工具會自動折回資料夾路徑。
+                  </p>
+
+                  {importing && (
+                    <p style={{ color: "var(--accent)", fontSize: 13, margin: "10px 0 0" }}>
+                      正在載入 EDB 並讀取疊構……第一次會慢（要載入 Ansys 的
+                      .NET 組件，約 30～60 秒），之後每次都是秒級。
+                    </p>
+                  )}
 
                   {importError && (
                     <p style={{ color: "var(--danger)", fontSize: 13, marginBottom: 0 }}>
@@ -644,9 +689,11 @@ export default function App() {
                     敏感度採樣點數
                     <small>ALHS</small>
                   </div>
+                  {/* 下限 2：冒煙測試（新疊構第一次真解）只需要證明它跑得完，
+                      不需要統計意義。8 點在 HFSS 模式下要 40 分鐘，太貴。 */}
                   <input
                     type="range"
-                    min={8}
+                    min={2}
                     max={60}
                     step={1}
                     value={numDesigns}
@@ -889,6 +936,7 @@ export default function App() {
           {step === 3
             ? "Ctrl+Enter 開始最佳化；跑完可從「檔案」選單開 optiSLang 結果"
             : "選單列「檢視」可直接跳到任一步"}
+          <span style={{ marginLeft: 14, opacity: 0.55 }}>建置 {__BUILD_TIME__}</span>
         </span>
         <span className="footer-spacer" />
         {step > 0 && (

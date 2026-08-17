@@ -130,6 +130,38 @@ jeff.hong@cadmen.com
 - Python 3.10; pyaedt 0.23.0, pyedb 0.65.1, ansys-optislang-core 1.5.0,
   scikit-rf 1.8.0, FastAPI
 
+## Project mode: run the customer's own board
+
+Step 1 can switch to "read the stackup from my board": point it at an `.aedb`
+(paste the path or use the browse dialog) and the tool reads the real stackup
+read-only — layer names, thicknesses, Dk/Df — then you pick the exit layer.
+The geometry is still rebuilt from the parametric description (see ADR-0001);
+the customer board contributes only its stackup.
+
+Below is a **real 12-layer board** (23 stackup entries including dielectrics,
+2.429 mm thick, weighted Dk 4.4, TOP in / inner L5 out) run as a 16-point
+40 GHz study — **16/16 solved successfully**, 93.7 minutes at 2 parallel:
+
+**Reflection MOP surface** (Moving Least Squares, CoP 83%): the corner with a
+small antipad and a long stub rises into a "reflection hill", with a flat
+low-reflection plain on the other side — which way to turn is obvious at a
+glance. The CoP matrix on the right simultaneously reports each parameter's
+contribution (stub 98.9% for resonance, GND distance 85.1% for area):
+
+![Reflection MOP surface, customer stackup](docs/images/osl-cust-mop-gamma.png)
+
+**Area MOP surface** (CoP 99%) — a purely geometric quantity predicts almost
+perfectly, residuals hugging the diagonal:
+
+![Area MOP surface, customer stackup](docs/images/osl-cust-mop-area.png)
+
+**Pareto front**: the optimizer ran 150 evaluations on the MOP, all feasible,
+6 landing on the front. At 4.87 mm² the reflection is 0.102; spending up to
+5.63 mm² buys 0.077 (25% better); going on to 7.64 mm² buys almost nothing —
+**the marginal return on area runs out around 5.6 mm²**:
+
+![Pareto front, customer stackup](docs/images/osl-cust-pareto.png)
+
 ## Acknowledgment
 
 The parametric via modeling in this project is based on **Via Wizard** by
