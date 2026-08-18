@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  forbidden-paths:
+    name: Forbid .venv / node_modules / .aedb in tracked files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check tracked files
+        run: |
+          set -e
+          matches=$(git ls-files | grep -E '(^|/)(\.venv|node_modules)/|\.aedb(/|$)|\.aedt\.lock$' || true)
+          if [ -n "$matches" ]; then
+            echo "The following files must not be committed:"
+            echo "$matches"
+            exit 1
+          fi
+          echo "OK: no .venv, node_modules, or .aedb files tracked."
+
+  secret-and-path-scan:
+    name: Sensitive path / credential scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan tracked files for local paths, credentials, license/customer info
+        run: |
+          set -e
+          export LC_ALL=C
+          EXCLUDES=":(exclude).git :(exclude).github/** :(exclude,glob)**/dist/** :(exclude,glob)**/*.min.js :(exclude,glob)**/package-lock.json :(exclude,glob)**/*.lock :(exclude,glob)**/*.svg :(exclude,glob)**/*.aedt :(exclude,glob)**/*.aedtz :(exclude)AGENTS.md :(exclude)README.en.md :(exclude)README.zh-TW.md :(exclude)NOTICE.md :(exclude).gitignore"
+          pattern='(^|[^A-Za-z])D:\\|(^|[^A-Za-z])C:\\Users|\\\\[A-Za-z0-9_.-]+\\|10\.[0-9]+\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|api[_-]?key|access[_-]?token|password|secret|private[_-]?key|license.?server|customer|private-source'
+          matches=$(git grep -I -n -i -E "$pattern" -- . $EXCLUDES || true)
+          if [ -n "$matches" ]; then
+            echo "Potential sensitive content found - review each line before merging:"
+            echo "$matches"
+            exit 1
+          fi
+          echo "OK: no obvious sensitive paths or credentials found in tracked text files."
+
+      # 上面那條掃描把 AGENTS.md 與兩份 README 排除掉，是為了讓它們能寫出
+      # `graph/…` 這類相對路徑與範例。但排除的代價是「本機絕對路徑」在這幾個
+      # 檔裡完全沒有防線，因此對這幾個檔單獨補一條規則，只擋磁碟機代號開頭的
+      # 絕對路徑與 UNC，不管其他關鍵字，兩邊互不干擾。
+      - name: Reject absolute local paths in the docs excluded above
+        run: |
+          set -e
+          export LC_ALL=C
+          DOCS="AGENTS.md README.en.md README.zh-TW.md NOTICE.md"
+          pattern='(^|[^A-Za-z])[A-Za-z]:[\\/]|\\\\[A-Za-z0-9_.-]+\\'
+          matches=$(git grep -I -n -E "$pattern" -- $DOCS || true)
+          if [ -n "$matches" ]; then
+            echo "Absolute local paths found in docs that the main scan excludes:"
+            echo "$matches"
+            exit 1
+          fi
+          echo "OK: no absolute local paths in the excluded docs."
+
+      - name: Remind that screenshots are never scanned
+        run: |
+          echo "NOTE: image files are binary and are never scanned by any rule above."
+          echo "Before committing a screenshot, check it for local paths, customer"
+          echo "names, and license info. Redact into a *-public.png variant and do"
+          echo "not commit the unredacted original."
+
+      - name: Reject .env / key files
+        run: |
+          set -e
+          matches=$(git ls-files | grep -E '(^|/)\.env(\..*)?$|\.pem$|\.key$|id_rsa' || true)
+          if [ -n "$matches" ]; then
+            echo "Credential-shaped files must not be committed:"
+            echo "$matches"
+            exit 1
+          fi
+          echo "OK: no .env/credential files tracked."
+
+  frontend-build:
+    name: Frontend TypeScript build check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web_app/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Type-check and build
+        run: npm run build
+      - name: Confirm dist/index.html is present after build
+        run: test -f dist/index.html
+
+  python-compile-check:
+    name: Python compile check (skips if no .py files are tracked)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile all tracked Python files
+        run: |
+          set -e
+          files=$(git ls-files '*.py' || true)
+          if [ -z "$files" ]; then
+            echo "No Python files tracked on this branch - skipping."
+            exit 0
+          fi
+          python -m py_compile $files
+
+  readme-link-check:
+    name: README link check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check links in README.md, README.en.md, README.zh-TW.md
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: >-
+            --no-progress
+            README.md README.en.md README.zh-TW.md
+          fail: true
