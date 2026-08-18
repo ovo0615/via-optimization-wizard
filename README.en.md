@@ -29,6 +29,36 @@ into a four-step wizard:
 
 ![Step 1: example and stackup](docs/images/wizard-01-example.png)
 
+## Both ends of the design space come from physics, not guesswork
+
+The stub-length range is derived, not chosen:
+
+```
+stub_mm   0.15  ~  0.8933
+            ↑         ↑
+   backdrill tolerance   40 GHz resonance floor
+```
+
+**The upper bound is computed.** Resonance = c / (4 · stub · √Dk) is strictly
+decreasing in stub, so "resonance ≥ 40 GHz" and "stub ≤ 0.8933 mm" are
+*exactly* equivalent. Encoding a constraint as a bound beats letting the
+optimizer wander into the infeasible region and then penalising it — the
+penalty makes the surrogate learn an artificial cliff (measured: CoP drops
+from 97.9% to 89.4%) and burns 11% of the sampling budget on points that
+carry no information.
+
+**The lower bound is manufacturability.** A 0.05 mm stub is 50 µm, below
+typical backdrill tolerance (±50–100 µm) — an optimizer should not recommend
+a design that cannot be built. Adjust this to your supplier's actual
+capability; it is a process limit, not a physical constant.
+
+A bonus: 0.05 mm also sits in an HFSS instability pocket. For one fixed
+geometry, a 0.05 mm stub stalled 3 of 4 solves in the frequency-sweep stage
+(88 / 33 / 15 minutes with no CPU activity); the same geometry at 0.15 mm
+solved once, in 12.7 minutes. **The corner an optimizer loves is exactly
+where the solver is least reliable** — without stall detection, an automated
+flow will sit silently stuck on the one point that matters most.
+
 ## Why vias, why TDR
 
 Vias are the structure SI engineers face every day — antipads, return paths,
