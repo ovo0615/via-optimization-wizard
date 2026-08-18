@@ -68,15 +68,24 @@ optiSLang three-stage flow                                     Touchstone
   area (closed-form), stub resonance (quarter-wave formula), reflection peak
   (HFSS solve) — constraint-violating designs are skipped before any solve
 
-## Measured numbers (20-core workstation, 6 cores/point)
+## Measured numbers (14-core laptop, 4 cores/point, 2 parallel)
 
 | Item | Value |
 | --- | --- |
 | Modeling (JSON → .aedb, 12-layer board) | 35 s |
-| Single HFSS solve (40 GHz sweep) | ~4.5 min |
-| 8-point sensitivity DOE (3 parallel) | 18 min |
-| EA optimization, 110–240 evaluations (on MOP) | seconds |
-| Loading a pre-run backup study | seconds |
+| Single HFSS solve (40 GHz sweep) | 4–5 min once warm |
+| **First design point** (incl. AEDT cold start) | **30+ min** |
+| 120-point sensitivity study (2 parallel) | 7.1 h (4.1 min per real solve) |
+| EA optimization, 90–240 evaluations (on MOP) | seconds |
+| Loading a pre-run backup study | 0.45 s |
+| Surrogate refit + NSGA-II (pure Python) | ~25 s |
+
+**That 30-minute first point is the demo landmine**: AEDT cold start and
+.NET assembly loading are all charged to the first design point. If you plan
+to solve live, warm the machine up with one throwaway solve first.
+
+Do not exceed 2 parallel: at 3, HFSS's MPI manager `hydra_pmi_proxy.exe`
+crashes repeatedly (0xC0000005, observed 4 times).
 
 The 40 GHz sweep ceiling was determined by a monotonicity experiment: with
 four designs of known quality ordering, 20 GHz scrambles the |Γ| ranking
@@ -174,27 +183,78 @@ compared is the worst-reflecting point of the 16-point study.
 
 ![TDR cross-check](docs/images/tdr-xcheck.png)
 
-| Metric | This tool | AEDT Circuit | Difference |
-| --- | ---: | ---: | ---: |
-| Impedance dip depth | 50.4 Ω | 49.7 Ω | **1.4%** |
-| Dip position | coincident after alignment | — | — |
-| Settled differential impedance | 73.3 Ω | 86.0 Ω | 12.7 Ω |
+| Metric | This tool | AEDT Circuit | Frequency-domain Sdd11 | Difference |
+| --- | ---: | ---: | ---: | ---: |
+| Settled differential impedance | 85.2 Ω | 86.0 Ω | **85.5 Ω** | **all three agree** |
+| Dip position | 40 ps | 40 ps | — | coincident |
+| Impedance dip depth | 58.7 Ω | 49.7 Ω | — | 15.3% |
 
-**The dip is what counts**: the response is |Γ| = ΔZ/2Z, which measures the
-*step* in impedance rather than its absolute level — and the two engines
-agree on that step to within 1.4%.
+**Three independent paths agree on the settled level**: this tool's IFFT,
+AEDT's Nexxim time-domain convolution, and the value obtained algebraically
+from the frequency-domain Sdd11. They share no code, so agreement is not the
+same error computed three times. In the chart, both curves' tails sit on the
+same dotted line.
 
-A third, independent check agrees as well: AEDT's settled value of 86.0 Ω
-matches the 85.5 Ω obtained algebraically from the frequency-domain Sdd11 at
-0.45 GHz. Those two paths share no code, so agreement is not the same error
-computed twice.
+### These numbers changed, and the reason is worth telling
 
-The 12.7 Ω gap in the settled level has not been resolved, and it is listed
-here rather than cropped out. Touchstone DC-row extrapolation has been ruled
-out as the cause: removing that row leaves every one of the 16 designs' |Γ|
-values unchanged and the ranking identical. It must be settled before
-quoting *absolute* differential impedance; the ranking that drives the
-optimization is unaffected.
+This section previously read "dip agrees to 1.4%, settled level off by
+12.7 Ω, unresolved". Investigation showed **that flattering 1.4% was two
+errors cancelling**.
+
+HFSS's exported Touchstone fills the very low frequencies (below roughly
+1 MHz) with extrapolated values rather than solved ones — across five
+designs the differential impedance there reads 63.7 / 75.0 / 84.1 / 88.6 Ω,
+differently wrong in every file, where the true value is 84–86 Ω. A step
+response's final value *is* ρ(DC), so that fabricated data dragged the whole
+TDR baseline down: measured across 107 designs, systematically low by
+**19.5 ± 7.1 Ω**. With the baseline pulled down, the dip's absolute value
+came down with it — and happened to land on AEDT's dip.
+
+The fix discards data below 10 MHz and extrapolates from the flat region
+instead (a differential via is electrically tiny; its impedance is flat from
+DC to several GHz, so that band carries no physics). After the fix:
+
+- Settled-vs-frequency-domain gap: 19.5 ± 7.1 Ω → **0.5 ± 0.1 Ω** (107
+  designs, full range 0.1–0.8)
+- |Γ| shifts by −2.9% at the median; ranking Spearman **0.9982** (largest
+  move 8 places)
+- But dip-depth agreement went from 1.4% to 15.3% — **the baseline is right
+  now, the dip is not yet**
+
+That remaining 15.3% is listed here rather than cropped out. This tool's
+curve is visibly smoother (it applies resolution-based smoothing; AEDT does
+not), which explains the direction but not the magnitude. It must be settled
+before quoting *absolute* dip depth; the ranking that drives the optimization
+is unaffected (Spearman 0.9982).
+
+## We verify our own recommendation
+
+The |Γ| values along a Pareto front are **predictions, not solves**. So the
+front's lowest-|Γ| design gets solved for real in HFSS (4 minutes):
+
+| | |
+| --- | --- |
+| Surrogate prediction | 0.0487 |
+| **HFSS actual** | **0.0790** |
+
+**Off by 38%** — from a surrogate whose CoP is 0.9799, which looks excellent.
+
+The reason: an optimizer **always pushes designs into the corners** of the
+design space (three of that design's four variables sit on a bound), and the
+corners are extrapolation territory. CoP is measured on interior samples and
+never tests extrapolation. On the same data a Gaussian process predicts
+0.0751 there (−5% error) while an RBF predicts 0.0487 (−38%) — and their CoP
+differs by only 0.0015, noise-level, yet that is what selected the model. A
+GP reverts to the mean away from data; an RBF extrapolates without bound and
+can invent an optimum better than anything ever observed.
+
+The fix: treat CoP differences under 0.01 as a tie and break ties by
+extrapolation safety. Error drops from −38.4% to −14.9%, with CoP going only
+from 0.9799 to 0.9792.
+
+**This applies to any surrogate-based optimization, optiSLang's MOP
+included.** Hence the built-in step of actually solving the recommended
+optimum — four minutes for a number you can defend to a customer.
 
 ## Acknowledgment
 
