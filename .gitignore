@@ -4,7 +4,7 @@
 # 此 repo 對外是「案例展示」：只公開前端原碼與文件。
 # 後端（PyEDB 建模、HFSS 編排、PyoptiSLang 流程）一律不追蹤。
 web_app/backend/
-scripts/
+/scripts/
 validation/
 
 # 啟動器沒有後端就跑不起來，放在公開版只會讓人以為下載了能執行
