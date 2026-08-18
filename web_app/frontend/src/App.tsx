@@ -801,11 +801,24 @@ export default function App() {
                             .catch((e) => setStartError(String(e)))
                         }
                       >
+                        {/*
+                          有標籤就用標籤當標題——「客戶 12 層真實板」比
+                          「HFSS · 40 GHz」更能讓客戶知道這張卡是什麼。
+                          標籤設定在 runs/prerun_demo.json，沒設就退回原本的顯示。
+                        */}
                         <h4>
-                          {p.solver === "hfss" ? "HFSS" : "示範"} ·{" "}
-                          {p.sweep_stop_ghz ? `${p.sweep_stop_ghz} GHz` : "—"}
+                          {p.label
+                            ? p.label
+                            : `${p.solver === "hfss" ? "HFSS" : "示範"} · ${
+                                p.sweep_stop_ghz ? `${p.sweep_stop_ghz} GHz` : "—"
+                              }`}
                         </h4>
                         <p>
+                          {p.label
+                            ? `${p.solver === "hfss" ? "HFSS" : "示範"} · ${
+                                p.sweep_stop_ghz ? `${p.sweep_stop_ghz} GHz` : "—"
+                              } · `
+                            : ""}
                           {p.design_counts.sensitivity ?? 0} 點敏感度 ·{" "}
                           {p.design_counts.optimization ?? 0} 點最佳化
                           {p.finished_at
@@ -834,6 +847,24 @@ export default function App() {
                   <h3 className="panel-title">
                     最佳化設計表（藍色 = Pareto 前緣，共 {designs.filter((d) => d.pareto).length} 點）
                   </h3>
+                  {/*
+                    前緣上每一點在畫面上長得一樣可信，但實測不是：同一個代理模型
+                    在膝點誤差 −1.5%、在端點 −14.7%。端點是所有維度的外推誤差
+                    往同一個方向疊起來的地方，而那正好是最佳化器的答案落點。
+                    所以這裡要把「該拿哪一點」講出來，不能只染一種藍色。
+                  */}
+                  <div className="teach-note" style={{ marginBottom: 10 }}>
+                    <b>建議拿膝點跟客戶談。</b>前緣上的 |Γ| 是 MOP
+                    的預測值；端點離真解資料最遠，實測誤差可差十倍
+                    （膝點 −1.5%、端點 −14.7%）。
+                    {designs.some((d) => d.extrapolated) && (
+                      <>
+                        {" "}標為 <span className="tag-extrap">外推</span>{" "}
+                        的點連「比所有解過的設計都好」都是模型自己推出來的，
+                        報數字前務必真的解一次。
+                      </>
+                    )}
+                  </div>
                   <table className="design-table">
                     <thead>
                       <tr>
@@ -844,6 +875,7 @@ export default function App() {
                         <th>|Γ|</th>
                         <th>面積 mm²</th>
                         <th>共振 GHz</th>
+                        <th>可信度</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -853,7 +885,17 @@ export default function App() {
                         .map((d) => (
                           <tr
                             key={d.id}
-                            className={d.pareto ? "pareto" : d.feasible ? "" : "infeasible"}
+                            className={
+                              d.knee
+                                ? "pareto knee"
+                                : d.pareto
+                                  ? d.extrapolated
+                                    ? "pareto extrapolated"
+                                    : "pareto"
+                                  : d.feasible
+                                    ? ""
+                                    : "infeasible"
+                            }
                           >
                             <td>{d.parameters.antipad_mm?.toFixed(3)}</td>
                             <td>{d.parameters.pitch_mm?.toFixed(3)}</td>
@@ -862,6 +904,17 @@ export default function App() {
                             <td>{d.responses.refl_peak_gamma?.toFixed(4)}</td>
                             <td>{d.responses.keepout_area_mm2?.toFixed(2)}</td>
                             <td>{d.responses.stub_resonance_ghz?.toFixed(1)}</td>
+                            <td title={d.extrapolation_note ?? ""}>
+                              {d.knee ? (
+                                <span className="tag-knee">膝點 · 建議</span>
+                              ) : d.extrapolated ? (
+                                <span className="tag-extrap">外推</span>
+                              ) : d.pareto ? (
+                                <span className="tag-inside">涵蓋範圍內</span>
+                              ) : (
+                                ""
+                              )}
+                            </td>
                           </tr>
                         ))}
                     </tbody>

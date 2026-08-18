@@ -83,6 +83,10 @@ export interface DesignRow {
   feasible: boolean;
   pareto: boolean;
   status: string;
+  // 只有前緣點會帶這三個欄位；舊的 state.json 載入時由後端補算。
+  extrapolated?: boolean;
+  extrapolation_note?: string;
+  knee?: boolean;
 }
 
 async function json<T>(res: Response): Promise<T> {
@@ -134,6 +138,9 @@ export interface PrerunEntry {
   solver: string;
   sweep_stop_ghz: number | null;
   design_counts: Record<string, number>;
+  // runs/prerun_demo.json 給的人話標籤（「客戶 12 層真實板 · …」）。
+  // 沒設定就是 null，卡片退回顯示點數與時間。
+  label?: string | null;
 }
 
 export function listPrerun(): Promise<{ studies: PrerunEntry[] }> {
