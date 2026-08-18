@@ -59,6 +59,29 @@ solved once, in 12.7 minutes. **The corner an optimizer loves is exactly
 where the solver is least reliable** — without stall detection, an automated
 flow will sit silently stuck on the one point that matters most.
 
+**We measured what that lower bound costs — and separated it from noise.**
+After re-running 72 points under the new bounds, the new Pareto front is
+0.021–0.033 worse in |Γ| at equal area than the old one. Calling that "the
+cost of the manufacturing limit" would be the natural thing to say, and it
+would be wrong by about a factor of two:
+
+| Source | \|Γ\| increase at equal area |
+| --- | --- |
+| The process bound itself (same old data, bound moved 0.05 → 0.15) | +0.013 – +0.017 |
+| Disagreement between the two studies' surrogates (kriging vs quadratic, different samples) | +0.004 – +0.021 |
+
+**The two terms are the same size.** Separating them takes two measurements:
+hold the model fixed and move the bound, then hold the bound fixed and swap
+the model. Plotting the two fronts together only ever shows you "the new one
+is worse".
+
+One more thing worth stating: in both runs the entire front sits *on* the
+stub lower bound (0.050–0.055 under the old bound, 0.150–0.159 under the new
+one). The optimizer's answer for stub is always "drill as deep as your process
+allows"; the real trade-off lives in antipad, pitch and GND clearance versus
+area. **Wherever you put that bound is where the answer lands** — which is
+exactly why it has to come from your supplier, not from us.
+
 ## Why vias, why TDR
 
 Vias are the structure SI engineers face every day — antipads, return paths,
@@ -124,29 +147,47 @@ entirely (the TDR resolution exceeds the via length), while 40 GHz and
 
 ![Step 4: run and results](docs/images/wizard-04-results.png)
 
-## Native optiSLang post-processing (24-point HFSS study)
+## Native optiSLang post-processing (72-point HFSS study)
 
 One click opens the optiSLang post-processor when the run completes — every
-chart below is computed and rendered by optiSLang itself, from a 24-point
-40 GHz HFSS sensitivity study (20 succeeded, 4 failed; the failures are
-honestly kept in the statistics).
+chart below is computed and rendered by optiSLang itself, from a 72-point
+40 GHz HFSS sensitivity study (69 succeeded; 3 were rejected by the solve-
+quality gate and are kept in the statistics rather than quietly dropped).
 
-**MOP response surface**: the Kriging surface of stub length vs. resonance
-frequency, CoP = 98% — the quarter-wave physics fully captured by the
-surrogate, with residuals hugging the diagonal:
+**MOP response surface**: peak reflection over stub and antipad, CoP = 96%.
+The two axes deliberately carry *different* parameters — putting one
+parameter on both axes only produces a fake surface stretched along the
+diagonal. Black dots are real solves, sitting close to the surface:
 
 ![MOP response surface](docs/images/osl-mop-surface.png)
 
-**Sensitivity analysis**: correlation matrix and coefficients. The CoP
-matrix shows each parameter's contribution to each response (GND distance
-85.7% for keep-out area, stub 98% for resonance) — which knobs matter, at
-a glance:
+**CoP matrix**: each parameter's contribution to each response, in one image:
 
-![Sensitivity analysis](docs/images/osl-sensitivity.png)
+| Response | antipad | pitch | GND dist. | stub | Total |
+| --- | --- | --- | --- | --- | --- |
+| Resonance frequency | — | — | — | **99.3%** | 99.3% |
+| Peak reflection | 21.0% | 2.3% | — | **72.2%** | 95.5% |
+| Keep-out area | 10.9% | 1.7% | **88.6%** | — | 99.5% |
 
-**Pareto front**: the reflection vs. routing-area trade-off with the front
-in red, alongside the selected best design's parameters, responses, and
-constraint margin:
+![CoP matrix](docs/images/osl-sensitivity.png)
+
+The three dashes are not omissions — they are **grey cells**: GND clearance
+contributes so little to reflection that optiSLang does not print a number.
+That matches what we measured independently on the Python side (correlation
++0.063 and −0.004 across two separate datasets — noise either way). **Two
+completely different implementations reaching the same conclusion is what
+makes it safe to tell a customer "you don't need to tune this one."**
+
+A side-by-side worth noting: optiSLang's MOP picked linear regression for
+reflection at CoP 96%; our own scikit-learn replacement picked a quadratic at
+CoP 96.2%. **Different algorithms, different implementations, 0.2 percentage
+points apart.**
+
+**Pareto front**: the reflection vs. routing-area trade-off, front in red.
+optiSLang's selected best design #85 is antipad 1.2 / pitch 1.041 / GND 0.891
+/ stub 0.15, giving |Γ| = 0.088 at 10.24 mm² — **stub pinned to the process
+lower bound, antipad pinned to the upper bound**, exactly matching the
+"the whole front sits on the bounds" observation above:
 
 ![Pareto front](docs/images/osl-pareto.png)
 
@@ -285,6 +326,62 @@ from 0.9799 to 0.9792.
 **This applies to any surrogate-based optimization, optiSLang's MOP
 included.** Hence the built-in step of actually solving the recommended
 optimum — four minutes for a number you can defend to a customer.
+
+### In the new design space: three points, all actually solved
+
+After the 72-point re-run, three positions on the front each got a real HFSS
+solve:
+
+| Verified point | Area | Predicted \|Γ\| | **Actual \|Γ\|** | Error |
+| --- | --- | --- | --- | --- |
+| **Knee** (69-point model) | 4.87 mm² | 0.1256 | **0.1237** | **−1.5%** |
+| Endpoint (69-point model) | 14.49 mm² | 0.0726 | **0.0851** | **−14.7%** |
+| Endpoint (refit after 1 infill) | 6.75 mm² | 0.0851 | **0.0894** | **+4.8%** |
+
+**Same model: −1.5% at the knee, −14.7% at the endpoint — a factor of ten.**
+The endpoint is where all the noise accumulates, and it is exactly where the
+optimizer's answer lands. One infill point pulls the endpoint error from
+−14.7% to +4.8%: infill works, but you have to run it more than once.
+
+### The bigger worry is not the error — the recommendation moves
+
+Feed the knee's solve back into the training set and refit, and the
+recommended optimum **relocates entirely**:
+
+| | 69 points | after 1 more |
+| --- | --- | --- |
+| GND clearance | 1.2515 | **0.6000** |
+| Keep-out area | 14.49 mm² | **6.75 mm²** |
+| **Actual \|Γ\|** | 0.0851 | 0.0894 |
+
+**The two designs reflect essentially the same (0.0851 vs 0.0894) while
+differing 2.1× in area.** The large design the 69-point model recommended
+spends an extra 7.7 mm² of keep-out to buy 0.004 in |Γ| — effectively nothing.
+
+Not because the model got worse (CoP 0.9616 → 0.9557), but because **GND
+clearance has no effect on reflection** — it is the grey cell in the CoP
+matrix. With no effect to learn, all the model has along that axis is noise:
+
+```
+69 pts: correlation −0.0142  →  gnd 0.6→1.4 moves predicted |Γ| by −0.00513  →  optimum runs to gnd = 1.4
+70 pts: correlation +0.0079  →  gnd 0.6→1.4 moves predicted |Γ| by  0.00000  →  optimum runs to gnd = 0.6
+```
+
+**A 0.005 shift in prediction — smaller than the model's own verification
+error — changed the recommended area by a factor of two.**
+
+This is not a bug; it is what "a parameter with no effect has a noise-valued
+optimum" necessarily looks like. Three practical consequences:
+
+1. **Give the customer the knee, not the endpoint.** The endpoint is where
+   all the noise accumulates — measured error differs by a factor of ten
+   (−1.5% vs −14.7%).
+2. **Read the CoP matrix's grey cells as a conclusion**, not as missing data.
+   A grey cell means that parameter is free to be set on other grounds —
+   cost, manufacturability, routing — which is often more useful than the
+   optimization result itself.
+3. **Run the verification more than once.** Each infill point moves the
+   recommendation; it has converged only when it stops moving.
 
 ## Acknowledgment
 
