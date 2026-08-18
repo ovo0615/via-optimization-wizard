@@ -714,6 +714,43 @@ body,
   text-decoration: line-through;
 }
 
+/* 前緣點的可信度：膝點是建議值，外推點的 |Γ| 是模型推出來的不是量到的。
+   用邊框與底色而不是換文字顏色——前緣本身已經用顏色表示了，再疊一層
+   顏色會讓「這是前緣嗎」跟「這點可信嗎」兩件事糊在一起。 */
+.design-table tr.knee td {
+  background: rgba(80, 200, 140, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(80, 200, 140, 0.35);
+}
+
+.design-table tr.extrapolated td {
+  background: rgba(230, 160, 60, 0.1);
+}
+
+.tag-knee,
+.tag-extrap,
+.tag-inside {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.tag-knee {
+  background: rgba(80, 200, 140, 0.22);
+  color: #7fe3b0;
+}
+
+.tag-extrap {
+  background: rgba(230, 160, 60, 0.2);
+  color: #f0b862;
+  cursor: help;
+}
+
+.tag-inside {
+  color: var(--text-muted);
+}
+
 /* ── 選項卡 ───────────────────────────────────────── */
 
 .choice-grid {
