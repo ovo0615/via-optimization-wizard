@@ -1,0 +1,25 @@
+掃描規則的自我測試樣本。這個檔案在掃描範圍之外（EXCLUDES 已排除
+.github/**），所以放這些字串不會讓正式掃描失敗。
+
+用途：bash .github/scripts/ci_scan_local.sh --selftest
+確認每一條規則都還會對下面這些行叫，而且不會誤判 NEGATIVE 那一段。
+
+為什麼需要：規則被改壞、或被人「順手簡化」之後靜靜地永遠不命中，是最
+危險的失效方式——看起來像乾淨，其實沒在檢查。
+
+以下每一行都應該命中規則：
+
+本機路徑：D:\Some Folder\something\file.txt
+使用者目錄：C:\Users\someone\Desktop
+UNC 路徑：\\fileserver\share\board.aedb
+內網位址：192.168.1.50
+授權伺服器：1055@licsrv01
+憑證字樣：api_key = abcdef123456
+
+NEGATIVE
+以下每一行都不該命中任何規則。誤判會讓人開始忽略掃描結果，
+那比沒有掃描更糟。
+
+the file was not found so we retried
+a plain backslash on its own is harmless
+version 1055 of the document
