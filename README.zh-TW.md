@@ -111,7 +111,7 @@ optiSLang 三段式流程                                Touchstone
 PyOptiSLang 流程建構）為私有，不在此 repo 內，因此 clone 後無法
 直接執行。
 
-技術交流與模擬服務請透過虎門科技（TADC）聯繫：jeff.hong@cadmen.com
+技術交流與模擬服務請透過虎門科技（TADC）聯繫：[jeff.hong@cadmen.com](mailto:jeff.hong@cadmen.com)
 
 ## 環境需求（私有後端）
 
