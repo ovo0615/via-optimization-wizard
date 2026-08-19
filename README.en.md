@@ -330,58 +330,84 @@ optimum — four minutes for a number you can defend to a customer.
 ### In the new design space: three points, all actually solved
 
 After the 72-point re-run, three positions on the front each got a real HFSS
-solve:
+solve. The actual |Γ| values are measured physics; the predictions come from
+the current code (fitted on the 69 sensitivity points — none of these three
+designs is in that training set):
 
 | Verified point | Area | Predicted \|Γ\| | **Actual \|Γ\|** | Error |
 | --- | --- | --- | --- | --- |
-| **Knee** (69-point model) | 4.87 mm² | 0.1256 | **0.1237** | **−1.5%** |
-| Endpoint (69-point model) | 14.49 mm² | 0.0726 | **0.0851** | **−14.7%** |
-| Endpoint (refit after 1 infill) | 6.75 mm² | 0.0851 | **0.0894** | **+4.8%** |
+| **Knee** | 4.87 mm² | 0.1146 | **0.1237** | −7.3% |
+| Endpoint A | 14.49 mm² | 0.0933 | **0.0851** | +9.6% |
+| Endpoint B | 6.75 mm² | 0.0920 | **0.0894** | +2.9% |
 
-**Same model: −1.5% at the knee, −14.7% at the endpoint — a factor of ten.**
-The endpoint is where all the noise accumulates, and it is exactly where the
-optimizer's answer lands. One infill point pulls the endpoint error from
-−14.7% to +4.8%: infill works, but you have to run it more than once.
+All three land within 10%. **But this table is not the basis for deciding
+which point to hand over** — n = 3 cannot support a claim about which is more
+accurate. The real basis is in the next section.
 
-### The bigger worry is not the error — the recommendation moves
+### The real basis: the endpoint moves, the knee does not
 
-Feed the knee's solve back into the training set and refit, and the
-recommended optimum **relocates entirely**:
+Same dataset, refitting after each added real solve, watching where the
+recommendation goes:
 
-| | 69 points | after 1 more |
-| --- | --- | --- |
-| GND clearance | 1.2515 | **0.6000** |
-| Keep-out area | 14.49 mm² | **6.75 mm²** |
-| **Actual \|Γ\|** | 0.0851 | 0.0894 |
+| Training points | Selected model | **Endpoint** area | **Knee** area | Knee GND clearance |
+| --- | --- | --- | --- | --- |
+| 69 | kriging (3 vars) | 6.80 mm² | 5.42 mm² | 0.600 |
+| 70 | kriging (4 vars) | **16.55 mm²** | 6.06 mm² | 0.602 |
+| 71 | kriging (3 vars) | 6.62 mm² | 5.60 mm² | 0.600 |
 
-**The two designs reflect essentially the same (0.0851 vs 0.0894) while
-differing 2.1× in area.** The large design the 69-point model recommended
-spends an extra 7.7 mm² of keep-out to buy 0.004 in |Γ| — effectively nothing.
+**The endpoint swings 2.4×; the knee swings 12%, with its GND clearance
+pinned to the bound.**
 
-Not because the model got worse (CoP 0.9616 → 0.9557), but because **GND
-clearance has no effect on reflection** — it is the grey cell in the CoP
-matrix. With no effect to learn, all the model has along that axis is noise:
+The cause is that **GND clearance has no effect on reflection** — it is the
+grey cell in the CoP matrix. With no effect to learn, all the model has along
+that axis is noise:
 
 ```
-69 pts: correlation −0.0142  →  gnd 0.6→1.4 moves predicted |Γ| by −0.00513  →  optimum runs to gnd = 1.4
-70 pts: correlation +0.0079  →  gnd 0.6→1.4 moves predicted |Γ| by  0.00000  →  optimum runs to gnd = 0.6
+69 pts: correlation −0.0142  →  gnd 0.6→1.4 moves predicted |Γ| by −0.00513  →  endpoint runs to gnd = 1.4
+70 pts: correlation +0.0079  →  gnd 0.6→1.4 moves predicted |Γ| by  0.00000  →  endpoint runs to gnd = 0.6
 ```
 
-**A 0.005 shift in prediction — smaller than the model's own verification
-error — changed the recommended area by a factor of two.**
+A **0.005** shift in prediction — smaller than the model's own verification
+error — is enough to throw the endpoint from one end of the design space to
+the other. And because GND clearance contributes 88.6% of the *area*, that
+sign flip doubles the recommended area.
 
-This is not a bug; it is what "a parameter with no effect has a noise-valued
-optimum" necessarily looks like. Three practical consequences:
+The knee is immune because it is set by the *shape* of the front, not by an
+extremum at one end. Noise cannot move where the trade-off stops paying off.
 
-1. **Give the customer the knee, not the endpoint.** The endpoint is where
-   all the noise accumulates — measured error differs by a factor of ten
-   (−1.5% vs −14.7%).
+Three practical consequences:
+
+1. **Give the customer the knee, not the endpoint.** The justification is
+   stability (12% vs 240%), not accuracy — all three verified points land
+   within 10%, and n = 3 cannot support an accuracy claim.
 2. **Read the CoP matrix's grey cells as a conclusion**, not as missing data.
    A grey cell means that parameter is free to be set on other grounds —
    cost, manufacturability, routing — which is often more useful than the
    optimization result itself.
 3. **Run the verification more than once.** Each infill point moves the
    recommendation; it has converged only when it stops moving.
+
+### A model-selection defect found along the way
+
+That "69 points picks 3 variables, 70 points picks 4" in the table above is
+worth a note of its own. The rule for picking a surrogate says *"treat CoP
+differences under 0.01 as a tie, and break ties by preferring fewer
+variables"* — but the implementation quantised CoP into **buckets** by
+rounding:
+
+```python
+bucket = -round(cop / 0.01)     # 0.9616 → bucket 96; 0.9547 → bucket 95
+```
+
+Those two differ by 0.0070 — inside the tolerance, so they should tie — yet
+they land in different buckets, so **the tie-breaking rule never fired at
+all**. On the same 69-point data, the old code picked quadratic with four
+variables (CoP 0.9616); the fixed code picks kriging with three (CoP 0.9518).
+
+The fix is to have no buckets: find the highest CoP in the field, then treat
+everything within one tolerance of it as tied. **Any tolerance comparison
+that quantises into buckets first has this boundary defect** — and it throws
+no error and logs no warning. It just quietly picks the wrong model.
 
 ## Acknowledgment
 
