@@ -1,6 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- favicon：品牌圖示的簡化版——差分 via 兩圓＋Pareto 曲線。
-       此工具由虎門科技資深技術工程師 Jeff Hong 洪敬傑提供 -->
+  <!-- favicon：品牌圖示的簡化版——差分 via 兩圓＋Pareto 曲線。 -->
   <rect width="32" height="32" rx="7" fill="#161c28"/>
   <circle cx="11" cy="10" r="5.5" fill="rgba(88,166,255,0.25)" stroke="#58a6ff" stroke-width="1.8"/>
   <circle cx="11" cy="10" r="2.6" fill="#58a6ff"/>

@@ -1,4 +1,3 @@
-// 此工具由虎門科技資深技術工程師 Jeff Hong 洪敬傑提供
 // 俯視圖：差分 via ＋ 環繞 GND via ＋ keep-out 範圍。
 // 純前端重繪——幾何規則與後端 flatten.py 一致（P 在 −y、N 在 +y，
 // GND 以每顆訊號 via 為圓心、gndRadius 為半徑、對稱排列）。

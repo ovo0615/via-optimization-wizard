@@ -1,4 +1,3 @@
-// 此工具由虎門科技資深技術工程師 Jeff Hong 洪敬傑提供
 // 與 FastAPI 後端的所有通訊集中在這裡。
 
 export interface ParamRange {
