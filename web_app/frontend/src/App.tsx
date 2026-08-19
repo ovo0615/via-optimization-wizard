@@ -1,4 +1,3 @@
-// 此工具由虎門科技資深技術工程師 Jeff Hong 洪敬傑提供
 // Via Optimization Wizard——四步精靈。
 // 分工原則：這個介面只負責「設定的簡單」；跑完之後的敏感度、CoP、
 // Pareto 圖用 optiSLang 原生後處理看，功勞歸 optiSLang。
@@ -311,8 +310,7 @@ export default function App() {
           <div>
             <h1>Via 最佳化精靈</h1>
             <p className="sub">
-              optiSLang × PyAEDT 多目標 via 最佳化 · 此工具由虎門科技資深技術工程師
-              Jeff Hong 洪敬傑提供
+              optiSLang × PyAEDT 多目標 via 最佳化
             </p>
           </div>
         </div>
@@ -369,7 +367,6 @@ export default function App() {
                 via 參數化建模設計源自早期 Ansys 技術專家林鳴志（linmingchih）的
                 Via Wizard。
               </p>
-              <p>此工具由虎門科技資深技術工程師 Jeff Hong 洪敬傑提供。</p>
             </div>
           </div>
         </div>

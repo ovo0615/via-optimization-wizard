@@ -1,7 +1,6 @@
 // 品牌圖示：差分 via（含 GND 環）→ 掃描 → Pareto 取捨曲線。
 // 一句話：「把 via 幾何掃一遍，找出取捨曲線上的最佳設計」。
 // 46px 可讀性規則：線寬 ≥1.6、最小元素 ≥3px、元素 ≤12、沿用介面語意色。
-// 此工具由虎門科技資深技術工程師 Jeff Hong 洪敬傑提供
 export default function BrandMark({ height = 46 }: { height?: number }) {
   const width = (height * 72) / 46;
   return (

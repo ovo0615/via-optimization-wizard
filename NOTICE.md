@@ -1,7 +1,5 @@
 # 權利聲明｜Notice
 
-此工具由虎門科技資深技術工程師 Jeff Hong 洪敬傑提供。
-
 本儲存庫為技術展示用途（demonstration only），保留所有權利
 （all rights reserved）。未經書面同意，請勿將本儲存庫之內容用於
 商業用途或再散布。

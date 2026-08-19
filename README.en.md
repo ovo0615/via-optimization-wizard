@@ -2,8 +2,6 @@
 
 English | [繁體中文](README.zh-TW.md)
 
-Provided by Jeff Hong, Senior Technical Engineer, Taiwan Auto-Design Co. (TADC).
-
 ---
 
 ## The problem this solves

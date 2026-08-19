@@ -12,6 +12,3 @@ Choose your language｜選擇語言：
 - [English](README.en.md)
 
 ---
-
-此工具由虎門科技資深技術工程師 Jeff Hong 洪敬傑提供。
-Provided by Jeff Hong, Senior Technical Engineer, Taiwan Auto-Design Co. (TADC).

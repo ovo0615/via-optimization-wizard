@@ -2,7 +2,6 @@
 // 每一項都只呼叫上層傳進來的函式，disabled／checked 也由上層決定——
 // 選單自己判斷能不能按，就會和面板上的按鈕說法不一致。
 // 沒有可用的項目一律 disabled 而不是隱藏。
-// 此工具由虎門科技資深技術工程師 Jeff Hong 洪敬傑提供
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 

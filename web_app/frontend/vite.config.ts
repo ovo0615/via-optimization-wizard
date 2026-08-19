@@ -1,4 +1,3 @@
-// 此工具由虎門科技資深技術工程師 Jeff Hong 洪敬傑提供
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
