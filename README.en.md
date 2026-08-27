@@ -80,6 +80,95 @@ allows"; the real trade-off lives in antipad, pitch and GND clearance versus
 area. **Wherever you put that bound is where the answer lands** — which is
 exactly why it has to come from your supplier, not from us.
 
+## How many parameters? Screen first, don't open everything
+
+A real via has far more than four parameters. But **adding one is not free** —
+we answered "which ones" by measurement.
+
+### A parameter with no effect makes the recommendation jump
+
+`gnd_distance` contributes a **grey cell** to reflection (correlation −0.014
+and +0.008; noise-level across three independent datasets). The consequence:
+add one training point, refit, and that noise-direction slope flips from
+−0.005 to 0.000 — **the recommended design jumps from 14.49 mm² to 6.75 mm²
+while the two reflect essentially the same (0.0851 vs 0.0894)**. The larger
+one spends an extra 7.7 mm² for nothing.
+
+**A parameter with no effect on the objective has a noise-valued optimum.**
+Hence: screen first, optimize second.
+
+### Screening: leave-one-out CoP drop
+
+Remove one parameter from the inputs, hold everything else fixed, recompute
+the cross-validated CoP. How much it drops is how much information that
+parameter carried. This is the counterpart of optiSLang's CoP-matrix "total
+effect", so the two can be cross-checked. The model type must be held fixed,
+or the drop mixes "one fewer variable" with "a different model".
+
+A 144-point, 8-parameter screening study (144/144 solved):
+
+| Parameter | CoP drop on reflection | Verdict |
+| --- | --- | --- |
+| stub | +0.9340 | keep |
+| antipad | +0.3271 | keep |
+| **trace separation** | +0.2726 | **there's a catch — see below** |
+| **drill diameter** | +0.1512 | keep (was hard-coded) |
+| pitch | +0.0370 | keep |
+| GND clearance | +0.0000 | grey (but +0.998 on area — the front's other axis) |
+| annular ring | +0.0085 | fix |
+| taper length | +0.0000 | fix |
+
+Sampling orthogonality was verified: the largest off-diagonal correlation
+among inputs is **+0.001**, against a noise threshold of ±0.163 at n=144 —
+the effects are real, not a sampling coincidence.
+
+### Trace separation ranks third, but the optimizer must not touch it
+
+Following it up, what it actually changes is the **trace's own differential
+impedance**, not the via:
+
+```
+Zdiff = 12.53 × separation + 81.55     144-point fit, R² 0.720, residual 0.45 Ω
+```
+
+A 0.45 Ω residual means the other seven via-geometry parameters barely move
+the trace impedance. The via is capacitive and sits low, so the higher the
+trace impedance, the bigger the step at the via, and the bigger the TDR peak.
+
+**Left free, the optimizer solves the via problem by making the trace narrow**
+— that is breaking the trace, not fixing the via. In practice trace separation
+is set by the impedance spec. Fixed at 0.250 it corresponds to 84.7 Ω, 0.3 Ω
+from the 85 Ω target, well inside the residual scatter.
+
+### What the drill diameter bought
+
+Drill diameter was added because tuning antipad without it explores only
+**half the impedance axis** (Z_via ∝ ln(antipad ÷ hole)). Using one dataset
+and one model, changing only whether the optimizer may move it:
+
+| Area | Drill free | Fixed at 0.25 | Improvement |
+| --- | --- | --- | --- |
+| 3.81 mm² | 0.1368 | 0.1705 | **19.7%** |
+| 4.75 mm² | 0.1030 | 0.1249 | 17.5% |
+| 7.12 mm² | 0.0768 | 0.0787 | 2.3% |
+
+Nearly 20% at the small-area end — far above the model's own 7.5%
+verification error.
+
+### Five survive, and three of them answer "your process limit"
+
+After the 100-point, 5-parameter optimization study (100/100 solved,
+333 minutes), the front has **stub pinned at 0.15, drill at 0.200 and GND
+clearance at 0.60 — every one of them a lower bound**.
+
+Which means those three need no simulation to know which way to push:
+**the value of simulating concentrates on antipad and pitch, the two that
+carry a genuine trade-off.** That is good news for a customer, and a usable
+opening line: establish your process limits first, then talk about optimizing.
+
+Knee verified by a real solve: predicted 0.0904, actual 0.0841 —
+**+7.5% error** (the model is conservative).
+
 ## Why vias, why TDR
 
 Vias are the structure SI engineers face every day — antipads, return paths,
