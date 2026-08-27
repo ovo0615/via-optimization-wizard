@@ -27,6 +27,17 @@ import tadcLogo from "./assets/tadc-logo.png";
 
 const STEPS = ["範例與疊構", "設計空間", "目標與約束", "執行"] as const;
 
+// 參數分成兩組，因為實測顯示它們的性質不同。
+//
+// 100 點五參數研究跑完之後，前緣上**殘樁貼在 0.15、鑽孔徑貼在 0.200、
+// GND 距離貼在 0.60，全部都是下界**。也就是這三個參數不需要模擬也知道
+// 要往哪邊調——最佳化器永遠會把它們推到你允許的極限。對它們而言，真正
+// 決定答案的是**下界填多少**，上界只是留給取樣的空間。
+//
+// antipad 與 pitch 不一樣：它們對反射與面積的作用方向相反，是真正需要
+// 取捨判斷的地方，模擬的價值集中在這裡。
+type ParamGroup = "tradeoff" | "process";
+
 const PARAM_META: {
   key: keyof DesignPoint;
   label: string;
@@ -34,14 +45,27 @@ const PARAM_META: {
   min: number;
   max: number;
   step: number;
+  group: ParamGroup;
 }[] = [
   // antipad 下限 0.6：pad 0.45 之下環狀間隙 < 0.15mm 不可製造，
   // 且極端幾何實測會讓 HFSS 掃頻收斂失敗
-  { key: "antipad_mm", label: "antipad 直徑", hint: "大→阻抗高、佔面積", min: 0.6, max: 1.4, step: 0.01 },
-  { key: "pitch_mm", label: "差分 pitch", hint: "P/N 中心距", min: 0.6, max: 1.4, step: 0.01 },
-  { key: "gnd_distance_mm", label: "GND via 距離", hint: "近→阻抗低、省面積", min: 0.5, max: 1.6, step: 0.01 },
-  { key: "stub_mm", label: "backdrill 殘樁", hint: "長→共振掉進頻寬", min: 0.0, max: 1.2, step: 0.01 },
+  { key: "antipad_mm", label: "antipad 直徑", hint: "大→阻抗高、佔面積", min: 0.6, max: 1.4, step: 0.01, group: "tradeoff" },
+  { key: "pitch_mm", label: "差分 pitch", hint: "P/N 中心距", min: 0.6, max: 1.4, step: 0.01, group: "tradeoff" },
+  { key: "stub_mm", label: "backdrill 殘樁", hint: "越短越好；下界＝背鑽公差", min: 0.0, max: 1.2, step: 0.01, group: "process" },
+  { key: "hole_diameter_mm", label: "鑽孔徑", hint: "越小越好；下界＝鑽頭與縱橫比", min: 0.15, max: 0.4, step: 0.005, group: "process" },
+  { key: "gnd_distance_mm", label: "GND via 距離", hint: "越近越好；下界＝反焊墊不重疊", min: 0.5, max: 1.6, step: 0.01, group: "process" },
 ];
+
+const GROUP_META: Record<ParamGroup, { title: string; note: string }> = {
+  tradeoff: {
+    title: "取捨變數——模擬的價值在這裡",
+    note: "對反射與面積的作用方向相反，沒有模擬看不出該落在哪。",
+  },
+  process: {
+    title: "製程極限——下界決定答案",
+    note: "實測前緣上這三個全部貼在下界。最佳化器永遠推到你允許的極限，所以請照供應商的實際能力填下界，上界只是留給取樣的空間。",
+  },
+};
 
 type Ranges = Record<keyof DesignPoint, ParamRange>;
 
@@ -49,7 +73,8 @@ const DEFAULT_RANGES: Ranges = {
   antipad_mm: { low: 0.6, high: 1.2 },
   pitch_mm: { low: 0.7, high: 1.2 },
   gnd_distance_mm: { low: 0.6, high: 1.4 },
-  stub_mm: { low: 0.05, high: 1.0 },
+  stub_mm: { low: 0.15, high: 0.9 },
+  hole_diameter_mm: { low: 0.2, high: 0.3 },
 };
 
 export default function App() {
@@ -590,12 +615,14 @@ export default function App() {
             <>
               <div className="teach-note">
                 <b>這一步在定義「設計空間」。</b>
-                optiSLang 會在這四個範圍裡自動採樣、找出哪些參數真正重要。
+                optiSLang 會在這些範圍裡自動採樣、找出哪些參數真正重要。
                 範圍拉太窄會錯過好設計，拉太寬會浪費求解次數——先用預設值就好。
               </div>
-              <div className="glass-panel">
-                <h3 className="panel-title">設計變數範圍（mm）</h3>
-                {PARAM_META.map((meta) => {
+              {(["tradeoff", "process"] as ParamGroup[]).map((g) => (
+              <div className="glass-panel" key={g}>
+                <h3 className="panel-title">{GROUP_META[g].title}</h3>
+                <p className="group-note">{GROUP_META[g].note}</p>
+                {PARAM_META.filter((m) => m.group === g).map((meta) => {
                   const r = ranges[meta.key];
                   return (
                     <div className="param-row" key={meta.key}>
@@ -638,12 +665,22 @@ export default function App() {
                         />
                       </div>
                       <div className="range-values">
-                        {r.low.toFixed(2)} – {r.high.toFixed(2)}
+                        {meta.group === "process" ? (
+                          <>
+                            <b>{r.low.toFixed(meta.step < 0.01 ? 3 : 2)}</b>
+                            <small> – {r.high.toFixed(meta.step < 0.01 ? 3 : 2)}</small>
+                          </>
+                        ) : (
+                          <>
+                            {r.low.toFixed(2)} – {r.high.toFixed(2)}
+                          </>
+                        )}
                       </div>
                     </div>
                   );
                 })}
               </div>
+              ))}
             </>
           )}
 
@@ -872,6 +909,7 @@ export default function App() {
                         <th>pitch</th>
                         <th>GND 距</th>
                         <th>stub</th>
+                        <th>鑽孔</th>
                         <th>|Γ|</th>
                         <th>面積 mm²</th>
                         <th>共振 GHz</th>
@@ -901,6 +939,8 @@ export default function App() {
                             <td>{d.parameters.pitch_mm?.toFixed(3)}</td>
                             <td>{d.parameters.gnd_distance_mm?.toFixed(3)}</td>
                             <td>{d.parameters.stub_mm?.toFixed(3)}</td>
+                            {/* 舊研究沒有這個參數，顯示「—」而不是空白或 0 */}
+                            <td>{d.parameters.hole_diameter_mm?.toFixed(3) ?? "—"}</td>
                             <td>{d.responses.refl_peak_gamma?.toFixed(4)}</td>
                             <td>{d.responses.keepout_area_mm2?.toFixed(2)}</td>
                             <td>{d.responses.stub_resonance_ghz?.toFixed(1)}</td>
