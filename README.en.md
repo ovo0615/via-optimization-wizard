@@ -14,9 +14,9 @@ into a four-step wizard:
 
 1. **Example & stackup**: a built-in 12-layer differential via with backdrill,
    or import the stackup from your own board
-2. **Design space**: four geometric variables (antipad, pitch, GND via
-   distance, backdrill stub) set by range sliders, with a live via-layout
-   preview and zero-solve analytical metrics
+2. **Design space**: five geometric variables (antipad, pitch, GND via
+   distance, backdrill stub, drill diameter) set by range sliders, with a live
+   via-layout preview and zero-solve analytical metrics
 3. **Objectives & constraints**: reflection (TDR |Γ| peak) vs. routing
    keep-out area as competing objectives; stub resonance frequency as a
    constraint — a stub long enough to drop its notch into the operating band
@@ -26,6 +26,56 @@ into a four-step wizard:
    post-processing when done
 
 ![Step 1: example and stackup](docs/images/wizard-01-example.png)
+
+## Read this first: the solver noise found on 2026-08-28
+
+Every |Γ| figure below has to be read against this section.
+
+The same design, on the same board, solved three times with the settings in use
+at the time gives **0.0928 / 0.0817 / 0.0749 — a 24% spread**. And nothing
+before the measurement suggested a problem: CoP 0.94 looked fine, the Pareto
+front looked fine, the knee looked fine.
+
+### Root cause: ΔS oscillates, and "converged" only asked it to dip once
+
+```
+pass 1  1.14660    pass 4  0.05466  <- back up, worse than the pass before
+pass 2  0.09337    pass 5  0.03228
+pass 3  0.02097    pass 6  0.01719  <- first dip below the 0.02 threshold, stop
+        ^ only 0.5% above the threshold
+```
+
+`MinConvergedPasses` defaults to 1, so a single dip ends the solve. **Which
+pass happens to dip first is essentially random**, so each solve lands on a
+different mesh. And `MaxDeltaS` at 0.02 is 25% of the |Γ| ≈ 0.08 being
+measured — the convergence tolerance was the same order as the quantity.
+
+### Fix and result
+
+| | Before | After |
+| --- | --- | --- |
+| Same design, three solves | 0.0928 / 0.0817 / 0.0749 | 0.0738 / 0.0734 / 0.0737 |
+| Spread | **24.0%** | **0.6%** |
+
+`min_converged_passes` 1→2, `max_delta_s` 0.02→0.01, `max_num_passes` 10→20.
+Solve time did not increase noticeably.
+
+### What this invalidates below
+
+- **The "all three verification points land within 10%" table does not hold.**
+  The measurement noise was larger than the errors being claimed.
+- A Pareto front **selects extremes**, and selecting extremes systematically
+  picks whichever point drew a low sample. Monte Carlo puts the bias on the
+  "best" |Γ| at about 16%; re-solving the old study's best point moved it from
+  0.0822 to 0.1025.
+- The 100-point study re-run with the fix: MOP CoP 0.9628 against a noise
+  ceiling of 0.9999 — **the limit moved from data noise to model capacity.**
+
+### Every study now ships with an error bar
+
+Each study ends by solving one design three times, writes σ into the result,
+and the UI shows it. Studies without a measurement say so explicitly — a blank
+reads as "no problem", when the truth is "nobody knows".
 
 ## Both ends of the design space come from physics, not guesswork
 
@@ -224,8 +274,14 @@ optiSLang three-stage flow                                     Touchstone
 .NET assembly loading are all charged to the first design point. If you plan
 to solve live, warm the machine up with one throwaway solve first.
 
-Do not exceed 2 parallel: at 3, HFSS's MPI manager `hydra_pmi_proxy.exe`
-crashes repeatedly (0xC0000005, observed 4 times).
+Parallelism is derived from the core count, not hard-coded. On a 14-core
+laptop, 3 parallel makes HFSS's MPI manager `hydra_pmi_proxy.exe` crash
+repeatedly (0xC0000005, observed 4 times); on a 20-core machine, 4 parallel
+measured 3.31 min per point against 7.47 at 2 parallel — about 2x.
+
+The rule is "reserve 4 cores for the system, divide the rest by cores-per-point,
+clamp to 1..4": 2 on 14 cores, 4 on 20. **One rule matching two measurements
+taken weeks apart on different machines** beats any hard-coded number.
 
 The 40 GHz sweep ceiling was determined by a monotonicity experiment: with
 four designs of known quality ordering, 20 GHz scrambles the |Γ| ranking
@@ -430,6 +486,13 @@ designs is in that training set):
 All three land within 10%. **But this table is not the basis for deciding
 which point to hand over** — n = 3 cannot support a claim about which is more
 accurate. The real basis is in the next section.
+
+> **2026-08-28 note: the error figures in this table are not citable.** They
+> were measured with the old convergence settings, where solving the same
+> design three times spread by 24% (see the section at the top) — **the
+> measurement noise exceeded the errors being claimed**. Re-done after the fix:
+> the knee's MOP prediction was 0.0860 against a real solve of 0.0876, a +1.8%
+> gap. The old +11.9% was mostly noise, not extrapolation error.
 
 ### The real basis: the endpoint moves, the knee does not
 
